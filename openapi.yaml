@@ -1,0 +1,483 @@
+openapi: 3.0.3
+info:
+  title: LeanStock API
+  version: 1.0.0
+  description: Sprint 1 LeanStock backend with complete auth/RBAC and atomic inventory transfers.
+servers:
+  - url: http://localhost:3000/api/v1
+tags:
+  - name: Auth
+  - name: Products
+  - name: Warehouses
+  - name: Stock
+  - name: Transfers
+  - name: Adjustments
+  - name: Suppliers
+  - name: Reports
+  - name: Admin
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Role:
+      type: string
+      enum: [SUPER_ADMIN, TENANT_ADMIN, WAREHOUSE_MANAGER, ANALYST]
+    AuthTokens:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        refreshToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiJ9...
+        expiresIn:
+          type: integer
+          example: 900
+    UserPublic:
+      type: object
+      properties:
+        id: { type: string, example: clxuser001 }
+        email: { type: string, format: email, example: owner@arzan.kz }
+        role: { $ref: "#/components/schemas/Role" }
+        tenantId: { type: string, example: clxtenant001 }
+        isActive: { type: boolean, example: true }
+        createdAt: { type: string, format: date-time }
+    ProductVariant:
+      type: object
+      properties:
+        id: { type: string, example: clxvar001 }
+        productId: { type: string, example: clxprod001 }
+        sku: { type: string, example: SHOE-BLK-42 }
+        barcode: { type: string, example: "4601234567890" }
+        size: { type: string, example: "42" }
+        color: { type: string, example: Black }
+        material: { type: string, example: Leather }
+        costPrice: { type: string, example: "2500.00" }
+        retailPrice: { type: string, example: "5990.00" }
+        currentPrice: { type: string, example: "5990.00" }
+        liquidationPrice: { type: string, example: "1500.00" }
+        reorderPoint: { type: integer, example: 10 }
+        lastSaleDate: { type: string, format: date-time, nullable: true }
+    Product:
+      type: object
+      properties:
+        id: { type: string, example: clxprod001 }
+        tenantId: { type: string, example: clxtenant001 }
+        name: { type: string, example: Urban Classic Sneakers }
+        description: { type: string, example: Leather city sneakers }
+        category: { type: string, example: Footwear }
+        baseUnit: { type: string, example: pcs }
+        isActive: { type: boolean, example: true }
+        variants:
+          type: array
+          items: { $ref: "#/components/schemas/ProductVariant" }
+    Warehouse:
+      type: object
+      properties:
+        id: { type: string, example: clxwh001 }
+        tenantId: { type: string, example: clxtenant001 }
+        name: { type: string, example: Main Warehouse }
+        address: { type: string, example: Almaty, Zhandosov 55 }
+        isActive: { type: boolean, example: true }
+    StockEntry:
+      type: object
+      properties:
+        variantId: { type: string, example: clxvar001 }
+        warehouseId: { type: string, example: clxwh001 }
+        quantity: { type: integer, example: 47 }
+        updatedAt: { type: string, format: date-time }
+    TransferStatus:
+      type: string
+      enum: [PENDING, IN_TRANSIT, COMPLETED, REJECTED]
+    TransferItem:
+      type: object
+      properties:
+        variantId: { type: string, example: clxvar001 }
+        quantity: { type: integer, example: 20 }
+    Transfer:
+      type: object
+      properties:
+        id: { type: string, example: clxtransfer001 }
+        sourceId: { type: string, example: clxwh001 }
+        destinationId: { type: string, example: clxwh002 }
+        status: { $ref: "#/components/schemas/TransferStatus" }
+        note: { type: string, example: Move weekend stock }
+        createdAt: { type: string, format: date-time }
+        completedAt: { type: string, format: date-time, nullable: true }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TransferItem" }
+    Error:
+      type: object
+      properties:
+        statusCode: { type: integer, example: 400 }
+        error: { type: string, example: Bad Request }
+        message: { type: string, example: quantity must be a positive integer }
+security:
+  - BearerAuth: []
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register new tenant user with selected role
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              tenantName: Arzan Shop
+              email: owner@arzan.kz
+              password: Secure!Pass99
+              role: TENANT_ADMIN
+      responses:
+        "201":
+          description: Created
+        "400": { description: Validation error, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: Email already registered, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login and receive JWT access and refresh tokens
+      description: Rate limited to 5 requests per minute per IP.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              email: owner@arzan.kz
+              password: Secure!Pass99
+      responses:
+        "200": { description: Login successful }
+        "401": { description: Invalid credentials, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "409": { description: User is already logged in, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Exchange refresh token for new tokens
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              refreshToken: eyJhbGciOiJIUzI1NiJ9...
+      responses:
+        "200": { description: New tokens issued, content: { application/json: { schema: { $ref: "#/components/schemas/AuthTokens" } } } }
+        "401": { description: Invalid or expired refresh token, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Revoke refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              refreshToken: eyJhbGciOiJIUzI1NiJ9...
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              example:
+                message: Logged out successfully
+        "401": { description: Invalid or expired refresh token, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /products:
+    get:
+      tags: [Products]
+      summary: Cursor-paginated product list scoped to tenant
+      parameters:
+        - { name: cursor, in: query, schema: { type: string } }
+        - { name: limit, in: query, schema: { type: integer, default: 20, maximum: 100 } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: search, in: query, schema: { type: string } }
+      responses:
+        "200": { description: Product list }
+        "401": { description: Unauthorized, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+    post:
+      tags: [Products]
+      summary: Create product with variants
+      description: Requires TENANT_ADMIN role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              name: Urban Classic Sneakers
+              description: Leather city sneakers
+              category: Footwear
+              baseUnit: pcs
+              variants:
+                - sku: SHOE-BLK-42
+                  size: "42"
+                  color: Black
+                  costPrice: 2500
+                  retailPrice: 5990
+                  liquidationPrice: 1500
+                  reorderPoint: 10
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        "403": { description: Wrong role, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Get product by id
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Found, content: { application/json: { schema: { $ref: "#/components/schemas/Product" } } } }
+        "404": { description: Not found, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /warehouses:
+    get:
+      tags: [Warehouses]
+      summary: List tenant warehouses
+      responses:
+        "200": { description: Warehouse list }
+    post:
+      tags: [Warehouses]
+      summary: Create warehouse
+      description: Requires TENANT_ADMIN role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              name: Main Warehouse
+              address: Almaty, Zhandosov 55
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Warehouse" } } } }
+  /stock:
+    get:
+      tags: [Stock]
+      summary: List tenant stock entries
+      parameters:
+        - { name: warehouseId, in: query, schema: { type: string } }
+        - { name: variantId, in: query, schema: { type: string } }
+      responses:
+        "200": { description: Stock list }
+    post:
+      tags: [Stock]
+      summary: Create or set stock quantity
+      description: Requires TENANT_ADMIN or WAREHOUSE_MANAGER role.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              variantId: clxvar001
+              warehouseId: clxwh001
+              quantity: 100
+      responses:
+        "201": { description: Upserted, content: { application/json: { schema: { $ref: "#/components/schemas/StockEntry" } } } }
+  /transfers:
+    get:
+      tags: [Transfers]
+      summary: List transfers
+      parameters:
+        - { name: status, in: query, schema: { $ref: "#/components/schemas/TransferStatus" } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: limit, in: query, schema: { type: integer, default: 20 } }
+      responses:
+        "200": { description: Transfer list }
+    post:
+      tags: [Transfers]
+      summary: Create atomic transfer and deduct source stock
+      description: Uses Redis Redlock plus a Prisma transaction.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              sourceId: clxwh001
+              destinationId: clxwh002
+              note: Move weekend stock
+              items:
+                - variantId: clxvar001
+                  quantity: 5
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Transfer" } } } }
+        "409": { description: Insufficient stock, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+        "422": { description: Source and destination cannot match, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /transfers/{id}/confirm:
+    post:
+      tags: [Transfers]
+      summary: Confirm transfer and increment destination stock
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Completed, content: { application/json: { schema: { $ref: "#/components/schemas/Transfer" } } } }
+        "409": { description: Invalid status, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /transfers/{id}/reject:
+    post:
+      tags: [Transfers]
+      summary: Reject transfer and return stock to source
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Rejected, content: { application/json: { schema: { $ref: "#/components/schemas/Transfer" } } } }
+        "409": { description: Invalid status, content: { application/json: { schema: { $ref: "#/components/schemas/Error" } } } }
+  /auth/verify-email:
+    post:
+      tags: [Auth]
+      summary: Verify registration email token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { token: "8d4f..." }
+      responses:
+        "200": { description: Email verified }
+        "401": { description: Invalid or expired token }
+  /auth/password-reset/request:
+    post:
+      tags: [Auth]
+      summary: Queue password reset email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { email: "owner@arzan.kz" }
+      responses:
+        "200": { description: Reset email queued when account exists }
+  /auth/password-reset/confirm:
+    post:
+      tags: [Auth]
+      summary: Reset password with emailed token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { token: "8d4f...", password: "NewSecure!Pass99" }
+      responses:
+        "200": { description: Password reset }
+        "401": { description: Invalid or expired token }
+  /stock/reserve:
+    post:
+      tags: [Stock]
+      summary: Reserve stock with TTL
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { variantId: clxvar001, warehouseId: clxwh001, quantity: 2, ttlSeconds: 900 }
+      responses:
+        "201": { description: Reservation created }
+        "409": { description: Insufficient available stock }
+  /adjustments:
+    get:
+      tags: [Adjustments]
+      summary: List stock adjustments
+      responses:
+        "200": { description: Adjustment list }
+    post:
+      tags: [Adjustments]
+      summary: Apply manual stock adjustment
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example:
+              warehouseId: clxwh001
+              reason: COUNT_CORRECTION
+              note: Physical count correction
+              items:
+                - variantId: clxvar001
+                  delta: -1
+      responses:
+        "201": { description: Adjustment created }
+        "409": { description: Adjustment would make stock negative }
+  /suppliers:
+    get:
+      tags: [Suppliers]
+      summary: List suppliers
+      responses:
+        "200": { description: Supplier list }
+    post:
+      tags: [Suppliers]
+      summary: Create supplier
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { name: "Almaty Wholesale LLP", email: "sales@example.kz", phone: "+77010000000" }
+      responses:
+        "201": { description: Supplier created }
+  /suppliers/{id}:
+    patch:
+      tags: [Suppliers]
+      summary: Update supplier
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { phone: "+77012223344", isActive: true }
+      responses:
+        "200": { description: Supplier updated }
+  /reports/valuation:
+    get:
+      tags: [Reports]
+      summary: Inventory cost and retail valuation
+      responses:
+        "200": { description: Valuation report }
+  /reports/turnover:
+    get:
+      tags: [Reports]
+      summary: Turnover risk report
+      responses:
+        "200": { description: Turnover report }
+  /reports/dead-stock:
+    get:
+      tags: [Reports]
+      summary: Dead-stock report and recommended markdowns
+      responses:
+        "200": { description: Dead-stock report }
+  /admin/tenants:
+    get:
+      tags: [Admin]
+      summary: List tenants
+      responses:
+        "200": { description: Tenant list }
+    post:
+      tags: [Admin]
+      summary: Create tenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            example: { name: "New Retail Tenant" }
+      responses:
+        "201": { description: Tenant created }
+  /admin/tenants/{id}/suspend:
+    post:
+      tags: [Admin]
+      summary: Suspend tenant
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { description: Tenant suspended }
+  /admin/queue/email:
+    get:
+      tags: [Admin]
+      summary: Email queue visibility
+      responses:
+        "200": { description: Queue counters by status }
+  /admin/queue/email/process-one:
+    post:
+      tags: [Admin]
+      summary: Process one queued email job
+      responses:
+        "200": { description: Job processed or queue empty }
+  /admin/jobs/dead-stock-decay/run:
+    post:
+      tags: [Admin]
+      summary: Run dead-stock price decay now
+      responses:
+        "200": { description: Decay job result }

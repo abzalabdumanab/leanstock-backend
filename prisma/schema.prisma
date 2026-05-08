@@ -1,0 +1,347 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  WAREHOUSE_MANAGER
+  ANALYST
+}
+
+enum TransferStatus {
+  PENDING
+  IN_TRANSIT
+  COMPLETED
+  REJECTED
+}
+
+enum AdjustmentReason {
+  DAMAGE
+  THEFT
+  SURPLUS
+  EXPIRY
+  COUNT_CORRECTION
+}
+
+enum EmailTokenType {
+  VERIFY_EMAIL
+  PASSWORD_RESET
+}
+
+enum EmailJobStatus {
+  QUEUED
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Tenant {
+  id          String           @id @default(cuid())
+  name        String
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  users       User[]
+  products    Product[]
+  warehouses  Warehouse[]
+  transfers   Transfer[]
+  suppliers   Supplier[]
+  adjustments Adjustment[]
+  emailJobs   EmailJob[]
+  auditLogs   AuditLog[]
+}
+
+model User {
+  id           String   @id @default(cuid())
+  tenantId     String?
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(TENANT_ADMIN)
+  isActive     Boolean  @default(true)
+  emailVerifiedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  tenant       Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([emailVerifiedAt])
+}
+
+model ActiveRefreshToken {
+  id        String   @id @default(cuid())
+  jti       String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model RevokedRefreshToken {
+  id        String   @id @default(cuid())
+  jti       String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model EmailToken {
+  id        String         @id @default(cuid())
+  userId    String
+  tokenHash String         @unique
+  type      EmailTokenType
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime       @default(now())
+
+  @@index([userId, type])
+  @@index([expiresAt])
+}
+
+model Product {
+  id          String           @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  category    String?
+  baseUnit    String
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  variants    ProductVariant[]
+
+  @@index([tenantId, isActive])
+  @@index([tenantId, category])
+}
+
+model ProductVariant {
+  id                 String         @id @default(cuid())
+  tenantId           String
+  productId          String
+  sku                String
+  barcode            String?
+  size               String?
+  color              String?
+  material           String?
+  costPrice          Decimal        @db.Decimal(12, 2)
+  retailPrice        Decimal        @db.Decimal(12, 2)
+  currentPrice       Decimal        @db.Decimal(12, 2)
+  liquidationPrice   Decimal        @db.Decimal(12, 2)
+  reorderPoint       Int            @default(0)
+  lastSaleDate       DateTime?
+  lastDecayAppliedAt DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  product            Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockEntries       StockEntry[]
+  transferItems      TransferItem[]
+  adjustmentItems    AdjustmentItem[]
+  purchaseOrderItems PurchaseOrderItem[]
+  reservations       StockReservation[]
+
+  @@unique([tenantId, sku])
+  @@index([tenantId, productId])
+}
+
+model Warehouse {
+  id                   String             @id @default(cuid())
+  tenantId             String
+  name                 String
+  address              String?
+  isActive             Boolean            @default(true)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  tenant               Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  stockEntries         StockEntry[]
+  sourceTransfers      Transfer[]         @relation("TransferSource")
+  destinationTransfers Transfer[]         @relation("TransferDestination")
+  adjustments          Adjustment[]
+  purchaseOrders       PurchaseOrder[]
+  reservations         StockReservation[]
+
+  @@index([tenantId, isActive])
+}
+
+model StockEntry {
+  id          String         @id @default(cuid())
+  tenantId    String
+  variantId   String
+  warehouseId String
+  quantity    Int            @default(0)
+  updatedAt   DateTime       @updatedAt
+  variant     ProductVariant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, variantId, warehouseId])
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, variantId])
+}
+
+model StockReservation {
+  id          String         @id @default(cuid())
+  tenantId    String
+  variantId   String
+  warehouseId String
+  quantity    Int
+  expiresAt   DateTime
+  releasedAt  DateTime?
+  createdById String
+  createdAt   DateTime       @default(now())
+  variant     ProductVariant @relation(fields: [variantId], references: [id])
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id])
+
+  @@index([tenantId, variantId, warehouseId])
+  @@index([expiresAt, releasedAt])
+}
+
+model Transfer {
+  id            String         @id @default(cuid())
+  tenantId      String
+  sourceId      String
+  destinationId String
+  status        TransferStatus @default(IN_TRANSIT)
+  note          String?
+  createdById   String
+  createdAt     DateTime       @default(now())
+  completedAt   DateTime?
+  tenant        Tenant         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  source        Warehouse      @relation("TransferSource", fields: [sourceId], references: [id])
+  destination   Warehouse      @relation("TransferDestination", fields: [destinationId], references: [id])
+  items         TransferItem[]
+
+  @@index([tenantId, status])
+  @@index([tenantId, sourceId])
+  @@index([tenantId, destinationId])
+}
+
+model TransferItem {
+  id         String         @id @default(cuid())
+  transferId String
+  tenantId   String
+  variantId  String
+  quantity   Int
+  transfer   Transfer       @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  variant    ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([tenantId, variantId])
+}
+
+model Supplier {
+  id        String          @id @default(cuid())
+  tenantId  String
+  name      String
+  email     String?
+  phone     String?
+  isActive  Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  tenant    Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  purchaseOrders PurchaseOrder[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId, isActive])
+}
+
+model Adjustment {
+  id          String           @id @default(cuid())
+  tenantId    String
+  warehouseId String
+  reason      AdjustmentReason
+  note        String?
+  createdById String
+  createdAt   DateTime         @default(now())
+  tenant      Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse        @relation(fields: [warehouseId], references: [id])
+  items       AdjustmentItem[]
+
+  @@index([tenantId, warehouseId])
+  @@index([tenantId, reason])
+}
+
+model AdjustmentItem {
+  id           String         @id @default(cuid())
+  adjustmentId String
+  tenantId     String
+  variantId    String
+  delta        Int
+  quantityAfter Int
+  adjustment   Adjustment    @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+  variant      ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([tenantId, variantId])
+}
+
+model PurchaseOrder {
+  id          String              @id @default(cuid())
+  tenantId    String
+  supplierId  String
+  warehouseId String
+  status      String              @default("DRAFT")
+  expectedAt  DateTime?
+  createdById String
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  supplier    Supplier            @relation(fields: [supplierId], references: [id])
+  warehouse   Warehouse           @relation(fields: [warehouseId], references: [id])
+  items       PurchaseOrderItem[]
+
+  @@index([tenantId, status])
+}
+
+model PurchaseOrderItem {
+  id              String         @id @default(cuid())
+  purchaseOrderId String
+  tenantId        String
+  variantId       String
+  quantity        Int
+  receivedQuantity Int          @default(0)
+  unitCost        Decimal        @db.Decimal(12, 2)
+  purchaseOrder   PurchaseOrder  @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  variant         ProductVariant @relation(fields: [variantId], references: [id])
+
+  @@index([tenantId, variantId])
+}
+
+model EmailJob {
+  id          String         @id @default(cuid())
+  tenantId    String?
+  to          String
+  subject     String
+  template    String
+  payload     Json
+  status      EmailJobStatus @default(QUEUED)
+  attempts    Int            @default(0)
+  lastError   String?
+  createdAt   DateTime       @default(now())
+  processedAt DateTime?
+  tenant      Tenant?        @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([tenantId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  tenantId  String?
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt])
+  @@index([entity, entityId])
+}

@@ -1,0 +1,297 @@
+{
+  "info": {
+    "name": "LeanStock Sprint 1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
+    { "key": "accessToken", "value": "" },
+    { "key": "refreshToken", "value": "" },
+    { "key": "productId", "value": "" },
+    { "key": "variantId", "value": "" },
+    { "key": "sourceId", "value": "" },
+    { "key": "destinationId", "value": "" },
+    { "key": "transferId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Auth - Register",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('register returns tokens', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.expect(json.tokens.accessToken).to.be.a('string');",
+              "  pm.expect(json.tokens.refreshToken).to.be.a('string');",
+              "  pm.collectionVariables.set('accessToken', json.tokens.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', json.tokens.refreshToken);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/register",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tenantName\": \"Defense Shop {{$timestamp}}\",\n  \"email\": \"owner{{$timestamp}}@arzan.kz\",\n  \"password\": \"SecurePass99!!!\",\n  \"role\": \"TENANT_ADMIN\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) {",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.tokens.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', json.tokens.refreshToken);",
+              "}",
+              "pm.test('login succeeds or reports active session', function () {",
+              "  pm.expect([200, 409]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/login",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@arzan.kz\",\n  \"password\": \"Password123!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Refresh",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('refresh returns new tokens', function () {",
+              "  pm.response.to.have.status(200);",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set('accessToken', json.accessToken);",
+              "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/refresh",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Logout",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('logout returns message', function () {",
+              "  pm.response.to.have.status(200);",
+              "  pm.expect(pm.response.json().message).to.eql('Logged out successfully');",
+              "  pm.collectionVariables.unset('accessToken');",
+              "  pm.collectionVariables.unset('refreshToken');",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/auth/logout",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Products - List",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/products?limit=20"
+      }
+    },
+    {
+      "name": "Products - Create",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('product created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  const json = pm.response.json();",
+              "  pm.collectionVariables.set('productId', json.id);",
+              "  pm.collectionVariables.set('variantId', json.variants[0].id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/products",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Urban Classic Sneakers {{$timestamp}}\",\n  \"description\": \"Leather city sneakers\",\n  \"category\": \"Footwear\",\n  \"baseUnit\": \"pcs\",\n  \"variants\": [\n    {\n      \"sku\": \"SHOE-DEF-{{$timestamp}}\",\n      \"size\": \"42\",\n      \"color\": \"Black\",\n      \"costPrice\": 2500,\n      \"retailPrice\": 5990,\n      \"liquidationPrice\": 1500,\n      \"reorderPoint\": 10\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Warehouses - List",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/warehouses"
+      }
+    },
+    {
+      "name": "Warehouses - Create Source",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('source warehouse created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.collectionVariables.set('sourceId', pm.response.json().id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/warehouses",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Main Warehouse {{$timestamp}}\",\n  \"address\": \"Almaty, Zhandosov 55\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Warehouses - Create Destination",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('destination warehouse created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.collectionVariables.set('destinationId', pm.response.json().id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/warehouses",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Second Warehouse {{$timestamp}}\",\n  \"address\": \"Astana, Mangilik El 1\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Stock - List",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/stock"
+      }
+    },
+    {
+      "name": "Stock - Create Or Set",
+      "request": {
+        "method": "POST",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/stock",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"variantId\": \"{{variantId}}\",\n  \"warehouseId\": \"{{sourceId}}\",\n  \"quantity\": 20\n}"
+        }
+      }
+    },
+    {
+      "name": "Transfers - List",
+      "request": {
+        "method": "GET",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/transfers"
+      }
+    },
+    {
+      "name": "Transfers - Create",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('transfer created', function () {",
+              "  pm.response.to.have.status(201);",
+              "  pm.collectionVariables.set('transferId', pm.response.json().id);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/transfers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"destinationId\": \"{{destinationId}}\",\n  \"note\": \"Defense transfer\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 5\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Transfers - Confirm",
+      "request": {
+        "method": "POST",
+        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "url": "{{baseUrl}}/transfers/{{transferId}}/confirm"
+      }
+    }
+  ]
+}
