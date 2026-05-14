@@ -19,7 +19,7 @@ const schema = Joi.object({
   SMTP_PORT: Joi.number().port().default(587),
   SMTP_USER: Joi.string().allow("").default(""),
   SMTP_PASS: Joi.string().allow("").default(""),
-  SMTP_FROM: Joi.string().email().default("LeanStock <noreply@leanstock.local>"),
+  SMTP_FROM: Joi.string().min(3).default("LeanStock <noreply@leanstock.local>"),
   EMAIL_WORKER_ENABLED: Joi.boolean().truthy("true").falsy("false").default(false),
   DEAD_STOCK_AFTER_DAYS: Joi.number().integer().min(1).default(30),
   DEAD_STOCK_DECAY_PERCENT: Joi.number().min(0.01).max(99).default(10),
