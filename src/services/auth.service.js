@@ -161,7 +161,7 @@ async function register({ tenantName, email, password, role = DEFAULT_ROLE }) {
     template: "VERIFY_EMAIL",
     payload: {
       heading: "Confirm your LeanStock account",
-      message: "Use this link to activate protected API access.",
+      message: "Click the button below to verify your email address. Protected LeanStock API routes stay blocked until verification is complete.",
       actionUrl: `${env.appBaseUrl}/api/v1/auth/verify-email?token=${result.verificationToken}`
     }
   });

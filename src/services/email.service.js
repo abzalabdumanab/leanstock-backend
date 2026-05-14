@@ -7,18 +7,27 @@ const QUEUE_KEY = "leanstock:email:queue";
 
 function renderEmail(job) {
   const payload = job.payload || {};
+  const safe = (value) => String(value || "").replace(/[<>&]/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[char]));
   const lines = [
     payload.heading || job.subject,
     "",
     payload.message || "",
-    payload.actionUrl ? `Open: ${payload.actionUrl}` : "",
+    payload.actionUrl ? `Open this link: ${payload.actionUrl}` : "",
     "",
+    "If you did not request this email, you can ignore it.",
     "LeanStock"
   ].filter(Boolean);
 
   return {
     text: lines.join("\n"),
-    html: `<p>${lines.map((line) => String(line).replace(/[<>&]/g, (char) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[char]))).join("</p><p>")}</p>`
+    html: [
+      `<h2>${safe(payload.heading || job.subject)}</h2>`,
+      payload.message ? `<p>${safe(payload.message)}</p>` : "",
+      payload.actionUrl ? `<p><a href="${safe(payload.actionUrl)}" style="display:inline-block;padding:10px 16px;background:#111827;color:#ffffff;text-decoration:none;border-radius:6px">Verify email</a></p>` : "",
+      payload.actionUrl ? `<p style="font-size:12px;color:#6b7280">Or open this link: ${safe(payload.actionUrl)}</p>` : "",
+      `<p style="font-size:12px;color:#6b7280">If you did not request this email, you can ignore it.</p>`,
+      `<p>LeanStock</p>`
+    ].filter(Boolean).join("")
   };
 }
 
