@@ -1,128 +1,186 @@
 {
   "info": {
-    "name": "LeanStock Sprint 1",
+    "name": "LeanStock Production API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
-    { "key": "baseUrl", "value": "http://localhost:3000/api/v1" },
-    { "key": "accessToken", "value": "" },
-    { "key": "refreshToken", "value": "" },
-    { "key": "productId", "value": "" },
-    { "key": "variantId", "value": "" },
-    { "key": "sourceId", "value": "" },
-    { "key": "destinationId", "value": "" },
-    { "key": "transferId", "value": "" }
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "healthUrl",
+      "value": "http://localhost:3000/health"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "refreshToken",
+      "value": ""
+    },
+    {
+      "key": "verificationToken",
+      "value": ""
+    },
+    {
+      "key": "resetToken",
+      "value": ""
+    },
+    {
+      "key": "productId",
+      "value": ""
+    },
+    {
+      "key": "variantId",
+      "value": ""
+    },
+    {
+      "key": "sourceId",
+      "value": ""
+    },
+    {
+      "key": "destinationId",
+      "value": ""
+    },
+    {
+      "key": "transferId",
+      "value": ""
+    },
+    {
+      "key": "supplierId",
+      "value": ""
+    },
+    {
+      "key": "tenantId",
+      "value": ""
+    }
   ],
   "item": [
     {
+      "name": "Health - Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{healthUrl}}"
+      }
+    },
+    {
       "name": "Auth - Register",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('register returns tokens', function () {",
-              "  pm.response.to.have.status(201);",
-              "  const json = pm.response.json();",
-              "  pm.expect(json.tokens.accessToken).to.be.a('string');",
-              "  pm.expect(json.tokens.refreshToken).to.be.a('string');",
-              "  pm.collectionVariables.set('accessToken', json.tokens.accessToken);",
-              "  pm.collectionVariables.set('refreshToken', json.tokens.refreshToken);",
-              "});"
-            ]
-          }
-        }
-      ],
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{baseUrl}}/auth/register",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"tenantName\": \"Defense Shop {{$timestamp}}\",\n  \"email\": \"owner{{$timestamp}}@arzan.kz\",\n  \"password\": \"SecurePass99!!!\",\n  \"role\": \"TENANT_ADMIN\"\n}"
         }
-      }
-    },
-    {
-      "name": "Auth - Login",
+      },
       "event": [
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "if (pm.response.code === 200) {",
-              "  const json = pm.response.json();",
-              "  pm.collectionVariables.set('accessToken', json.tokens.accessToken);",
-              "  pm.collectionVariables.set('refreshToken', json.tokens.refreshToken);",
-              "}",
-              "pm.test('login succeeds or reports active session', function () {",
-              "  pm.expect([200, 409]).to.include(pm.response.code);",
-              "});"
+              "pm.test('registered', () => pm.response.to.have.status(201));",
+              "const json = pm.response.json();",
+              "if (json.tokens) { pm.collectionVariables.set('accessToken', json.tokens.accessToken); pm.collectionVariables.set('refreshToken', json.tokens.refreshToken); }",
+              "if (json.user) { pm.collectionVariables.set('tenantId', json.user.tenantId); }",
+              "if (json.verificationToken) { pm.collectionVariables.set('verificationToken', json.verificationToken); }"
             ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "Auth - Verify Email",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/verify-email",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{verificationToken}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Login",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{baseUrl}}/auth/login",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"email\": \"admin@arzan.kz\",\n  \"password\": \"Password123!\"\n}"
         }
-      }
-    },
-    {
-      "name": "Auth - Refresh",
+      },
       "event": [
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('refresh returns new tokens', function () {",
-              "  pm.response.to.have.status(200);",
-              "  const json = pm.response.json();",
-              "  pm.collectionVariables.set('accessToken', json.accessToken);",
-              "  pm.collectionVariables.set('refreshToken', json.refreshToken);",
-              "});"
+              "if (pm.response.code === 200) { const json = pm.response.json(); pm.collectionVariables.set('accessToken', json.tokens.accessToken); pm.collectionVariables.set('refreshToken', json.tokens.refreshToken); pm.collectionVariables.set('tenantId', json.user.tenantId); }"
             ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "Auth - Refresh",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{baseUrl}}/auth/refresh",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"refreshToken\": \"{{refreshToken}}\"\n}"
         }
-      }
-    },
-    {
-      "name": "Auth - Logout",
+      },
       "event": [
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('logout returns message', function () {",
-              "  pm.response.to.have.status(200);",
-              "  pm.expect(pm.response.json().message).to.eql('Logged out successfully');",
-              "  pm.collectionVariables.unset('accessToken');",
-              "  pm.collectionVariables.unset('refreshToken');",
-              "});"
+              "if (pm.response.code === 200) { const json = pm.response.json(); pm.collectionVariables.set('accessToken', json.accessToken); pm.collectionVariables.set('refreshToken', json.refreshToken); }"
             ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "Auth - Logout",
       "request": {
         "method": "POST",
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
         "url": "{{baseUrl}}/auth/logout",
         "body": {
           "mode": "raw",
@@ -131,109 +189,195 @@
       }
     },
     {
-      "name": "Products - List",
+      "name": "Auth - Password Reset Request",
       "request": {
-        "method": "GET",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
-        "url": "{{baseUrl}}/products?limit=20"
-      }
-    },
-    {
-      "name": "Products - Create",
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/password-reset/request",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"admin@arzan.kz\"\n}"
+        }
+      },
       "event": [
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('product created', function () {",
-              "  pm.response.to.have.status(201);",
-              "  const json = pm.response.json();",
-              "  pm.collectionVariables.set('productId', json.id);",
-              "  pm.collectionVariables.set('variantId', json.variants[0].id);",
-              "});"
+              "if (pm.response.code === 200) { const json = pm.response.json(); if (json.resetToken) pm.collectionVariables.set('resetToken', json.resetToken); }"
             ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "Auth - Password Reset Confirm",
       "request": {
         "method": "POST",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": "{{baseUrl}}/auth/password-reset/confirm",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"password\": \"NewSecurePass99!!!\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Products - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/products?limit=20"
+      }
+    },
+    {
+      "name": "Products - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/products",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Urban Classic Sneakers {{$timestamp}}\",\n  \"description\": \"Leather city sneakers\",\n  \"category\": \"Footwear\",\n  \"baseUnit\": \"pcs\",\n  \"variants\": [\n    {\n      \"sku\": \"SHOE-DEF-{{$timestamp}}\",\n      \"size\": \"42\",\n      \"color\": \"Black\",\n      \"costPrice\": 2500,\n      \"retailPrice\": 5990,\n      \"liquidationPrice\": 1500,\n      \"reorderPoint\": 10\n    }\n  ]\n}"
         }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) { const json = pm.response.json(); pm.collectionVariables.set('productId', json.id); pm.collectionVariables.set('variantId', json.variants[0].id); }"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Products - Get By Id",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/products/{{productId}}"
       }
     },
     {
       "name": "Warehouses - List",
       "request": {
         "method": "GET",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/warehouses"
       }
     },
     {
       "name": "Warehouses - Create Source",
-      "event": [
-        {
-          "listen": "test",
-          "script": {
-            "type": "text/javascript",
-            "exec": [
-              "pm.test('source warehouse created', function () {",
-              "  pm.response.to.have.status(201);",
-              "  pm.collectionVariables.set('sourceId', pm.response.json().id);",
-              "});"
-            ]
-          }
-        }
-      ],
       "request": {
         "method": "POST",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/warehouses",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Main Warehouse {{$timestamp}}\",\n  \"address\": \"Almaty, Zhandosov 55\"\n}"
         }
-      }
-    },
-    {
-      "name": "Warehouses - Create Destination",
+      },
       "event": [
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('destination warehouse created', function () {",
-              "  pm.response.to.have.status(201);",
-              "  pm.collectionVariables.set('destinationId', pm.response.json().id);",
-              "});"
+              "if (pm.response.code === 201) pm.collectionVariables.set('sourceId', pm.response.json().id);"
             ]
           }
         }
-      ],
+      ]
+    },
+    {
+      "name": "Warehouses - Create Destination",
       "request": {
         "method": "POST",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/warehouses",
         "body": {
           "mode": "raw",
           "raw": "{\n  \"name\": \"Second Warehouse {{$timestamp}}\",\n  \"address\": \"Astana, Mangilik El 1\"\n}"
         }
-      }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) pm.collectionVariables.set('destinationId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
     },
     {
       "name": "Stock - List",
       "request": {
         "method": "GET",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/stock"
       }
     },
@@ -241,8 +385,16 @@
       "name": "Stock - Create Or Set",
       "request": {
         "method": "POST",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/stock",
         "body": {
           "mode": "raw",
@@ -251,46 +403,331 @@
       }
     },
     {
+      "name": "Stock - Reserve",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/stock/reserve",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"variantId\": \"{{variantId}}\",\n  \"warehouseId\": \"{{sourceId}}\",\n  \"quantity\": 2,\n  \"ttlSeconds\": 900\n}"
+        }
+      }
+    },
+    {
       "name": "Transfers - List",
       "request": {
         "method": "GET",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/transfers"
       }
     },
     {
       "name": "Transfers - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/transfers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"destinationId\": \"{{destinationId}}\",\n  \"note\": \"Defense transfer\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 5\n    }\n  ]\n}"
+        }
+      },
       "event": [
         {
           "listen": "test",
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test('transfer created', function () {",
-              "  pm.response.to.have.status(201);",
-              "  pm.collectionVariables.set('transferId', pm.response.json().id);",
-              "});"
+              "if (pm.response.code === 201) pm.collectionVariables.set('transferId', pm.response.json().id);"
             ]
           }
         }
-      ],
-      "request": {
-        "method": "POST",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
-        "header": [{ "key": "Content-Type", "value": "application/json" }],
-        "url": "{{baseUrl}}/transfers",
-        "body": {
-          "mode": "raw",
-          "raw": "{\n  \"sourceId\": \"{{sourceId}}\",\n  \"destinationId\": \"{{destinationId}}\",\n  \"note\": \"Defense transfer\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"quantity\": 5\n    }\n  ]\n}"
-        }
-      }
+      ]
     },
     {
       "name": "Transfers - Confirm",
       "request": {
         "method": "POST",
-        "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{accessToken}}", "type": "string" }] },
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
         "url": "{{baseUrl}}/transfers/{{transferId}}/confirm"
+      }
+    },
+    {
+      "name": "Transfers - Reject",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/transfers/{{transferId}}/reject"
+      }
+    },
+    {
+      "name": "Adjustments - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/adjustments"
+      }
+    },
+    {
+      "name": "Adjustments - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/adjustments",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"warehouseId\": \"{{sourceId}}\",\n  \"reason\": \"COUNT_CORRECTION\",\n  \"note\": \"Physical count correction\",\n  \"items\": [\n    {\n      \"variantId\": \"{{variantId}}\",\n      \"delta\": -1\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Suppliers - List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/suppliers"
+      }
+    },
+    {
+      "name": "Suppliers - Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/suppliers",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"Almaty Wholesale {{$timestamp}}\",\n  \"email\": \"sales@example.kz\",\n  \"phone\": \"+77010000000\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) pm.collectionVariables.set('supplierId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Suppliers - Update",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/suppliers/{{supplierId}}",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"phone\": \"+77012223344\",\n  \"isActive\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Reports - Valuation",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/reports/valuation"
+      }
+    },
+    {
+      "name": "Reports - Turnover",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/reports/turnover"
+      }
+    },
+    {
+      "name": "Reports - Dead Stock",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/reports/dead-stock"
+      }
+    },
+    {
+      "name": "Admin - Tenants List",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/tenants"
+      }
+    },
+    {
+      "name": "Admin - Tenants Create",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/tenants",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"name\": \"New Retail Tenant {{$timestamp}}\"\n}"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 201) pm.collectionVariables.set('tenantId', pm.response.json().id);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin - Tenant Suspend",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/tenants/{{tenantId}}/suspend"
+      }
+    },
+    {
+      "name": "Admin - Email Queue Stats",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/queue/email"
+      }
+    },
+    {
+      "name": "Admin - Email Queue Process One",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/queue/email/process-one"
+      }
+    },
+    {
+      "name": "Admin - Run Dead Stock Decay",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{accessToken}}"
+          }
+        ],
+        "url": "{{baseUrl}}/admin/jobs/dead-stock-decay/run"
       }
     }
   ]
