@@ -94,6 +94,11 @@ async function processOneEmailJob() {
     return null;
   }
 
+  const existingJob = await prisma.emailJob.findUnique({ where: { id: jobId } });
+  if (!existingJob) {
+    return null;
+  }
+
   const job = await prisma.emailJob.update({
     where: { id: jobId },
     data: { status: "PROCESSING", attempts: { increment: 1 } }
