@@ -40,8 +40,21 @@ function createTransport() {
     host: env.smtp.host,
     port: env.smtp.port,
     secure: env.smtp.port === 465,
-    auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.pass } : undefined
+    auth: env.smtp.user ? { user: env.smtp.user, pass: env.smtp.pass } : undefined,
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 20000,
+    tls: { rejectUnauthorized: true }
   });
+}
+
+function extractEmailAddress(value) {
+  if (!value) {
+    return null;
+  }
+
+  const match = String(value).match(/<([^>]+)>/);
+  return (match ? match[1] : value).trim();
 }
 
 async function enqueueEmail({ tenantId, to, subject, template, payload }) {
@@ -66,15 +79,28 @@ async function sendJob(job) {
     return { skipped: true, reason: "SMTP is not configured" };
   }
 
-  await transport.sendMail({
+  const fromAddress = extractEmailAddress(env.smtp.from) || env.smtp.user;
+
+  await transport.verify();
+  const info = await transport.sendMail({
     from: env.smtp.from,
+    sender: fromAddress,
+    envelope: { from: fromAddress, to: job.to },
     to: job.to,
     subject: job.subject,
     text: rendered.text,
-    html: rendered.html
+    html: rendered.html,
+    headers: {
+      "X-LeanStock-Template": job.template,
+      "X-LeanStock-Job-Id": job.id
+    }
   });
 
-  return { skipped: false };
+  console.log(
+    `Email sent: job=${job.id} to=${job.to} messageId=${info.messageId || "n/a"} accepted=${(info.accepted || []).join(",") || "n/a"}`
+  );
+
+  return { skipped: false, messageId: info.messageId };
 }
 
 async function processOneEmailJob() {
@@ -119,7 +145,7 @@ async function processOneEmailJob() {
       where: { id: job.id },
       data: {
         status: job.attempts + 1 >= 3 ? "FAILED" : "QUEUED",
-        lastError: error.message,
+        lastError: error.response || error.message,
         processedAt: new Date()
       }
     });
