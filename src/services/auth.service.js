@@ -154,6 +154,8 @@ async function register({ tenantName, email, password, role = DEFAULT_ROLE }) {
     return { tenant, user, verificationToken, tokens };
   });
 
+  const verificationUrl = `${env.appBaseUrl}/api/v1/auth/verify-email?token=${result.verificationToken}`;
+
   await enqueueEmail({
     tenantId: result.tenant.id,
     to: result.user.email,
@@ -162,7 +164,7 @@ async function register({ tenantName, email, password, role = DEFAULT_ROLE }) {
     payload: {
       heading: "Confirm your LeanStock account",
       message: "Click the button below to verify your email address. Protected LeanStock API routes stay blocked until verification is complete.",
-      actionUrl: `${env.appBaseUrl}/api/v1/auth/verify-email?token=${result.verificationToken}`
+      actionUrl: verificationUrl
     }
   });
 
@@ -170,7 +172,8 @@ async function register({ tenantName, email, password, role = DEFAULT_ROLE }) {
     user: publicUser(result.user),
     tokens: result.tokens || undefined,
     verificationRequired: true,
-    verificationToken: env.nodeEnv === "test" ? result.verificationToken : undefined
+    verificationToken: env.nodeEnv !== "production" ? result.verificationToken : undefined,
+    verificationUrl: env.nodeEnv !== "production" ? verificationUrl : undefined
   };
 }
 
