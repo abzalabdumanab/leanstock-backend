@@ -5,6 +5,7 @@ const env = require("../config/env");
 const { prisma } = require("../config/database");
 const ApiError = require("../utils/ApiError");
 const { enqueueEmail } = require("./email.service");
+const { safeRecordAudit } = require("./audit.service");
 
 const DEFAULT_ROLE = "TENANT_ADMIN";
 
@@ -168,6 +169,15 @@ async function register({ tenantName, email, password, role = DEFAULT_ROLE }) {
     }
   });
 
+  await safeRecordAudit({
+    tenantId: result.tenant.id,
+    actorId: result.user.id,
+    action: "USER_REGISTERED",
+    entity: "User",
+    entityId: result.user.id,
+    metadata: { email: result.user.email, role: result.user.role }
+  });
+
   return {
     user: publicUser(result.user),
     tokens: result.tokens || undefined,
@@ -199,6 +209,15 @@ async function verifyEmail(token) {
     });
   });
 
+  await safeRecordAudit({
+    tenantId: user.tenantId,
+    actorId: user.id,
+    action: "EMAIL_VERIFIED",
+    entity: "User",
+    entityId: user.id,
+    metadata: { email: user.email }
+  });
+
   return { user: publicUser(user), message: "Email verified successfully" };
 }
 
@@ -222,7 +241,17 @@ async function login({ email, password }) {
     throw new ApiError(409, "User is already logged in");
   }
 
-  return { user: publicUser(user), tokens: await createActiveTokenSet(user) };
+  const tokens = await createActiveTokenSet(user);
+  await safeRecordAudit({
+    tenantId: user.tenantId,
+    actorId: user.id,
+    action: "LOGIN_SUCCEEDED",
+    entity: "User",
+    entityId: user.id,
+    metadata: { email: user.email, role: user.role }
+  });
+
+  return { user: publicUser(user), tokens };
 }
 
 async function refresh(refreshToken) {
@@ -253,6 +282,15 @@ async function logout(refreshToken) {
   const payload = verifyRefreshToken(refreshToken);
   await revokeRefreshPayload(payload);
 
+  await safeRecordAudit({
+    tenantId: payload.tenantId,
+    actorId: payload.sub,
+    action: "LOGOUT_SUCCEEDED",
+    entity: "User",
+    entityId: payload.sub,
+    metadata: { jti: payload.jti }
+  });
+
   return { message: "Logged out successfully" };
 }
 
@@ -273,6 +311,15 @@ async function requestPasswordReset(email) {
       message: "This link expires in 60 minutes.",
       actionUrl: `${env.appBaseUrl}/api/v1/auth/reset-password?token=${token}`
     }
+  });
+
+  await safeRecordAudit({
+    tenantId: user.tenantId,
+    actorId: user.id,
+    action: "PASSWORD_RESET_REQUESTED",
+    entity: "User",
+    entityId: user.id,
+    metadata: { email: user.email }
   });
 
   return {
@@ -300,6 +347,14 @@ async function resetPassword({ token, password }) {
     await tx.emailToken.update({ where: { id: record.id }, data: { usedAt: new Date() } });
     await tx.user.update({ where: { id: record.userId }, data: { passwordHash } });
     await tx.activeRefreshToken.deleteMany({ where: { userId: record.userId } });
+  });
+
+  await safeRecordAudit({
+    tenantId: null,
+    actorId: record.userId,
+    action: "PASSWORD_RESET_COMPLETED",
+    entity: "User",
+    entityId: record.userId
   });
 
   return { message: "Password reset successfully" };
