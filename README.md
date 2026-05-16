@@ -1,6 +1,6 @@
 # LeanStock Backend
 
-Production-ready multi-tenant inventory backend for the LeanStock final defense. The system uses Express, Prisma ORM, PostgreSQL, Redis-backed rate limiting/locks/queues, JWT auth with refresh-token rotation, RBAC, async email delivery, and documented business workflows.
+Production-ready multi-tenant inventory backend and operations frontend for the LeanStock final defense. The system uses Express, Prisma ORM, PostgreSQL, Redis-backed rate limiting/locks/queues, JWT auth with refresh-token rotation, RBAC, async email delivery, React/Vite frontend, and documented business workflows.
 
 ## Implemented Scope
 
@@ -11,6 +11,7 @@ Production-ready multi-tenant inventory backend for the LeanStock final defense.
 - Reports: valuation, turnover risk, dead-stock recommendations.
 - Background work: Redis-backed email queue, manual queue processor endpoint, scheduled dead-stock price decay.
 - Documentation: Swagger UI at `/docs`, contract in `openapi.yaml`, Postman collection in `postman_collection.json`.
+- Frontend console: login, dashboard, products, warehouses, stock, transfers, adjustments, suppliers, queue visibility, and audit logs.
 
 ## Architecture Notes
 
@@ -57,6 +58,37 @@ API: `http://localhost:3000/api/v1`
 Swagger: `http://localhost:3000/docs`  
 Health: `http://localhost:3000/health`
 
+## Frontend Setup
+
+The React/Vite frontend lives in `frontend/` and talks to the backend through `VITE_API_BASE_URL`.
+
+```bash
+cd frontend
+copy .env.example .env
+npm install
+npm run dev
+```
+
+Frontend: `http://localhost:5173`  
+Default API URL: `http://localhost:3000/api/v1`
+
+From the repository root you can also run:
+
+```bash
+npm run frontend:dev
+npm run frontend:build
+npm run frontend:lint
+```
+
+Start the backend first with `npm run dev`, then open the frontend. Use the seeded super admin account:
+
+```text
+super@arzan.kz
+Password123!
+```
+
+If the backend returns `User is already logged in`, log out with the saved refresh token or clear the user's active session in the database before logging in again.
+
 ## Tests And Quality
 
 ```bash
@@ -64,6 +96,8 @@ $env:DATABASE_URL=$env:TEST_DATABASE_URL
 npx prisma migrate deploy
 npm run lint
 npm test
+npm run frontend:lint
+npm run frontend:build
 ```
 
 Latest local verification: `npm run lint` passed; `npm test` passed with 3 suites and 5 tests.
@@ -130,5 +164,8 @@ npm run migrate:deploy
 npm run seed
 npm run lint
 npm test
+npm run frontend:dev
+npm run frontend:build
+npm run frontend:lint
 docker compose up --build
 ```
