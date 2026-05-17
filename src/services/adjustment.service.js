@@ -39,15 +39,20 @@ async function createAdjustment(tenantId, user, body) {
       const variant = await tx.productVariant.findFirst({ where: { id: item.variantId, tenantId } });
       if (!variant) throw new ApiError(404, `Variant ${item.variantId} not found`);
 
-      const stock = await tx.stockEntry.upsert({
-        where: { tenantId_variantId_warehouseId: { tenantId, variantId: item.variantId, warehouseId: body.warehouseId } },
-        update: { quantity: { increment: item.delta } },
-        create: { tenantId, variantId: item.variantId, warehouseId: body.warehouseId, quantity: item.delta }
+      const existingStock = await tx.stockEntry.findUnique({
+        where: { tenantId_variantId_warehouseId: { tenantId, variantId: item.variantId, warehouseId: body.warehouseId } }
       });
+      const quantityAfter = (existingStock?.quantity || 0) + item.delta;
 
-      if (stock.quantity < 0) {
+      if (quantityAfter < 0) {
         throw new ApiError(409, `Adjustment would make stock negative for variant ${item.variantId}`);
       }
+
+      const stock = await tx.stockEntry.upsert({
+        where: { tenantId_variantId_warehouseId: { tenantId, variantId: item.variantId, warehouseId: body.warehouseId } },
+        update: { quantity: quantityAfter },
+        create: { tenantId, variantId: item.variantId, warehouseId: body.warehouseId, quantity: quantityAfter }
+      });
 
       items.push(await tx.adjustmentItem.create({
         data: {

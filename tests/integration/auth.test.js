@@ -62,17 +62,22 @@ describe("auth and RBAC", () => {
       // Түсіндірме: Осы жол ағымдағы логиканың бір қадамын орындайды.
       .expect(200);
 
-    await request(app)
+    const secondLogin = await request(app)
       .post("/api/v1/auth/login")
       .send({ email: "owner@arzan.kz", password: "Secure!Pass99" })
-      .expect(409);
+      .expect(200);
+
+    await request(app)
+      .post("/api/v1/auth/refresh")
+      .send({ refreshToken: login.body.tokens.refreshToken })
+      .expect(401);
 
     // Түсіндірме: Асинхронды операцияның аяқталуын күтеді.
     const refreshed = await request(app)
       // Түсіндірме: Осы жол ағымдағы логиканың бір қадамын орындайды.
       .post("/api/v1/auth/refresh")
       // Түсіндірме: Ашылған код блогын немесе өрнекті жабады.
-      .send({ refreshToken: login.body.tokens.refreshToken })
+      .send({ refreshToken: secondLogin.body.tokens.refreshToken })
       // Түсіндірме: Осы жол ағымдағы логиканың бір қадамын орындайды.
       .expect(200);
 

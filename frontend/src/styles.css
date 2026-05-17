@@ -470,6 +470,37 @@ tr:last-child td {
   border: 1px solid #fecdd3;
 }
 
+.notice.success {
+  background: #ecfdf5;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.auth-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  background: #eef2f1;
+  border: 1px solid #dce3e0;
+  border-radius: 8px;
+  padding: 5px;
+  margin-bottom: 18px;
+}
+
+.auth-tabs button {
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #475569;
+  min-height: 36px;
+}
+
+.auth-tabs button.active {
+  background: #ffffff;
+  color: #0f766e;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+}
+
 .empty-state {
   min-height: 180px;
   display: grid;

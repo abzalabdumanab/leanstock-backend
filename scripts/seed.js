@@ -4,8 +4,8 @@ const { prisma } = require("../src/config/database");
 async function upsertUser({ tenantId, email, passwordHash, role }) {
   return prisma.user.upsert({
     where: { email },
-    update: { tenantId, passwordHash, role, isActive: true },
-    create: { tenantId, email, passwordHash, role }
+    update: { tenantId, passwordHash, role, isActive: true, emailVerifiedAt: new Date() },
+    create: { tenantId, email, passwordHash, role, emailVerifiedAt: new Date() }
   });
 }
 

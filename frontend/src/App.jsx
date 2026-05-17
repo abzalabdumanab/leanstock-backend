@@ -120,13 +120,22 @@ function useApi(session, setSession) {
 
 function LoginView({ onLogin }) {
   const [form, setForm] = useState({ email: "super@arzan.kz", password: "Password123!" });
+  const [registerForm, setRegisterForm] = useState({
+    tenantName: "LeanStock Demo Tenant",
+    email: "",
+    password: "Password123!",
+    role: "TENANT_ADMIN"
+  });
+  const [mode, setMode] = useState("login");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   async function submit(event) {
     event.preventDefault();
     setLoading(true);
     setError("");
+    setNotice("");
     try {
       const response = await fetch(`${API_BASE}/auth/login`, {
         method: "POST",
@@ -144,6 +153,31 @@ function LoginView({ onLogin }) {
     }
   }
 
+  async function register(event) {
+    event.preventDefault();
+    setLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(registerForm)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Registration failed");
+      setNotice(data.verificationUrl
+        ? `Registration created. Open verification link: ${data.verificationUrl}`
+        : "Registration created. Check email and verify account before login.");
+      setForm({ email: registerForm.email, password: registerForm.password });
+      setMode("login");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
     <main className="login-shell">
       <section className="login-panel">
@@ -152,19 +186,50 @@ function LoginView({ onLogin }) {
         </div>
         <h1>LeanStock Console</h1>
         <p>Inventory operations, transfers, audit visibility, and stock intelligence connected directly to your backend.</p>
-        <form onSubmit={submit} className="login-form">
-          <Field label="Email">
-            <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
-          </Field>
-          <Field label="Password">
-            <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-          </Field>
-          <ApiErrorBanner error={error} />
-          <button className="primary wide" disabled={loading}>
-            {loading ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}
-            Sign in
-          </button>
-        </form>
+        <div className="auth-tabs">
+          <button className={mode === "login" ? "active" : ""} onClick={() => setMode("login")}>Sign in</button>
+          <button className={mode === "register" ? "active" : ""} onClick={() => setMode("register")}>Register</button>
+        </div>
+
+        {mode === "login" ? (
+          <form onSubmit={submit} className="login-form">
+            <Field label="Email">
+              <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+            </Field>
+            <Field label="Password">
+              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+            </Field>
+            <ApiErrorBanner error={error} />
+            {notice && <div className="notice success"><CheckCircle2 size={18} /><span>{notice}</span></div>}
+            <button className="primary wide" disabled={loading}>
+              {loading ? <Loader2 className="spin" size={18} /> : <KeyRound size={18} />}
+              Sign in
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={register} className="login-form">
+            <Field label="Tenant name">
+              <input value={registerForm.tenantName} onChange={(e) => setRegisterForm({ ...registerForm, tenantName: e.target.value })} />
+            </Field>
+            <Field label="Email">
+              <input value={registerForm.email} onChange={(e) => setRegisterForm({ ...registerForm, email: e.target.value })} />
+            </Field>
+            <Field label="Password">
+              <input type="password" value={registerForm.password} onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })} />
+            </Field>
+            <SelectField
+              label="Role"
+              value={registerForm.role}
+              onChange={(value) => setRegisterForm({ ...registerForm, role: value })}
+              options={["TENANT_ADMIN", "WAREHOUSE_MANAGER", "ANALYST"].map((role) => [role, role])}
+            />
+            <ApiErrorBanner error={error} />
+            <button className="primary wide" disabled={loading}>
+              {loading ? <Loader2 className="spin" size={18} /> : <UserRound size={18} />}
+              Create account
+            </button>
+          </form>
+        )}
       </section>
     </main>
   );

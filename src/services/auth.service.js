@@ -90,25 +90,6 @@ async function createEmailToken(userId, type, client = prisma) {
   return token;
 }
 
-async function pruneExpiredSessions(userId, client = prisma) {
-  await client.activeRefreshToken.deleteMany({
-    where: {
-      userId,
-      expiresAt: { lte: new Date() }
-    }
-  });
-}
-
-async function findActiveSession(userId) {
-  await pruneExpiredSessions(userId);
-  return prisma.activeRefreshToken.findFirst({
-    where: {
-      userId,
-      expiresAt: { gt: new Date() }
-    }
-  });
-}
-
 function verifyRefreshToken(refreshToken) {
   try {
     return jwt.verify(refreshToken, env.jwtRefreshSecret);
@@ -236,10 +217,7 @@ async function login({ email, password }) {
     throw new ApiError(403, "Email verification is required before login");
   }
 
-  const activeSession = await findActiveSession(user.id);
-  if (activeSession) {
-    throw new ApiError(409, "User is already logged in");
-  }
+  await prisma.activeRefreshToken.deleteMany({ where: { userId: user.id } });
 
   const tokens = await createActiveTokenSet(user);
   await safeRecordAudit({
